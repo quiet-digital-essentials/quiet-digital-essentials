@@ -9,7 +9,6 @@ jobs:
     if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     
-    # Force open permissions directly in the blueprint to allow file creation
     permissions:
       contents: write
       pull-requests: read
