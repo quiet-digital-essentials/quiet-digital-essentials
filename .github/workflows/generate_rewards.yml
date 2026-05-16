@@ -1,1 +1,45 @@
 name: Generate Unlimited Contribution Certificates
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  generate-pdf:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    
+    # Force open permissions directly in the blueprint to allow file creation
+    permissions:
+      contents: write
+      pull-requests: read
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Headless Browser Backend
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgconf-2-4 libatk1.0-0 libatk-bridge2.0-0 libgdk-pixbuf2.0-0 libgtk-3-0 libgbm-dev
+
+      - name: Compile and Export Printable Certificate
+        env:
+          DEV_NAME: ${{ github.event.pull_request.user.login }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_HASH: ${{ github.event.pull_request.merge_commit_sha }}
+        run: |
+          node .github/scripts/build-pdf.js
+
+      - name: Upload Printable Asset to Release Matrix
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: verified-credentials
+          files: cert-${{ github.event.pull_request.user.login }}.pdf
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
