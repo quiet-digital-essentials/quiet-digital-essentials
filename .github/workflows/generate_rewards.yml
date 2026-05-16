@@ -9,6 +9,10 @@ jobs:
     if: github.event.pull_request.merged == true
     runs-on: ubuntu-latest
     
+    # Silences the Node.js deprecation warning completely
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
     permissions:
       contents: write
       pull-requests: read
@@ -17,28 +21,34 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
       - name: Install Headless Browser Backend
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgconf-2-4 libatk1.0-0 libatk-bridge2.0-0 libgdk-pixbuf2.0-0 libgtk-3-0 libgbm-dev
+          sudo apt-get install -y google-chrome-stable
 
-      - name: Compile and Export Printable Certificate
-        env:
-          DEV_NAME: ${{ github.event.pull_request.user.login }}
-          PR_TITLE: ${{ github.event.pull_request.title }}
-          PR_HASH: ${{ github.event.pull_request.merge_commit_sha }}
+      - name: Inject Metadata and Export Printable PDF
         run: |
-          node .github/scripts/build-pdf.js
+          # 1. Create a clean variable set from the merge event
+          DEV_NAME="@${{ github.event.pull_request.user.login }}"
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          PR_HASH=$(echo "${{ github.event.pull_request.merge_commit_sha }}" | cut -c1-8)
+          DATE_STR=$(date +'%B %d, %Y')
+
+          # 2. Read your HTML template and replace placeholders natively using sed
+          sed -e "s/@dev_username/$DEV_NAME/g" \
+              -e "s/For successful optimization and submission of production code patch asset fixing core responsive layout issues./$PR_TITLE/g" \
+              -e "s/QDE-9842X-SYS/QDE-${PR_HASH^^}/g" \
+              -e "s/APPROVED \& VERIFIED/VERIFIED ON ${DATE_STR^^}/g" \
+              ./templates/certificate_template.html > ./templates/active_compiled_cert.html
+
+          # 3. Print the HTML layout cleanly into a high-resolution PDF asset
+          google-chrome --headless --no-sandbox --disable-dev-shm-usage --disable-gpu --print-to-pdf=cert-${{ github.event.pull_request.user.login }}.pdf ./templates/active_compiled_cert.html
 
       - name: Upload Printable Asset to Release Matrix
         uses: softprops/action-gh-release@v2
         with:
           tag_name: verified-credentials
           files: cert-${{ github.event.pull_request.user.login }}.pdf
+          preserve_order: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
