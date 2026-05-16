@@ -10,18 +10,18 @@ const dateString = new Date().toLocaleDateString('en-US', { year: 'numeric', mon
 // 2. Read the master printable certificate template
 let htmlContent = fs.readFileSync('./templates/certificate_template.html', 'utf8');
 
-// 3. Dynamically inject variables over the template placeholders
+// 3. Dynamically inject variables over the template placeholders using native JavaScript replacements
 htmlContent = htmlContent
     .replace('@dev_username', `@${devName}`)
     .replace('For successful optimization and submission of production code patch asset fixing core responsive layout issues.', prTitle)
     .replace('QDE-9842X-SYS', `QDE-${prHash.toUpperCase()}`)
     .replace('APPROVED & VERIFIED', `VERIFIED ON ${dateString.toUpperCase()}`);
 
+// 4. Save the active compiled version
 fs.writeFileSync('./templates/active_compiled_cert.html', htmlContent);
 
-// 4. Use native CLI to export HTML directly to PDF utilizing print boundaries
+// 5. Use native CLI to export HTML directly to PDF utilizing print boundaries
 try {
-    // FIXED: Added --no-sandbox and --disable-dev-shm-usage flags so Chrome doesn't crash inside the automated container
     execSync(`google-chrome --headless --no-sandbox --disable-dev-shm-usage --disable-gpu --print-to-pdf=cert-${devName}.pdf ./templates/active_compiled_cert.html`);
     console.log(`Certificate successfully compiled for ${devName}`);
 } catch (error) {
