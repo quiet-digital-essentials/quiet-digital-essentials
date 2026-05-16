@@ -17,6 +17,11 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: Inject Metadata Into Template
         run: |
           DEV_NAME="@${{ github.event.pull_request.user.login }}"
@@ -31,11 +36,19 @@ jobs:
               -e "s/APPROVED \& VERIFIED/VERIFIED ON ${DATE_STR^^}/g" \
               ./templates/certificate_template.html > ./templates/active_compiled_cert.html
 
-      - name: Convert HTML to PDF Natively
-        uses: flybywiresmart/html-to-pdf-action@v1
-        with:
-          html_file: ./templates/active_compiled_cert.html
-          pdf_file: cert-${{ github.event.pull_request.user.login }}.pdf
+      - name: Convert HTML to PDF with Puppeteer
+        run: |
+          npm install puppeteer
+          node -e "
+            const puppeteer = require('puppeteer');
+            (async () => {
+              const browser = await puppeteer.launch();
+              const page = await browser.newPage();
+              await page.goto('file://$PWD/templates/active_compiled_cert.html', { waitUntil: 'networkidle0' });
+              await page.pdf({path: 'cert-${{ github.event.pull_request.user.login }}.pdf', format: 'A4'});
+              await browser.close();
+            })();
+          "
 
       - name: Upload Printable Asset to Release Matrix
         uses: softprops/action-gh-release@v2
